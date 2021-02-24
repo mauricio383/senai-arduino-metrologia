@@ -1,19 +1,19 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
-#include <DHTesp.h>
+#include "DHT.h"
 
 const char* ssid = "AAPM";  // Rede WiFi
 const char* password = "";  //Senha da Rede WiFi
 
-#define DHTpin 14    //D5 of NodeMCU is GPIO14
+#define DHTPIN D5 // pino que estamos conectado
+#define DHTTYPE DHT11 // DHT 11
 
-DHTesp dht;
+DHT dht(DHTPIN, DHTTYPE);
 
 void setup()
 {
-  Serial.begin(115200);
-
-  dht.setup(DHTpin, DHTesp::DHT11); //for DHT11 Connect DHT sensor to GPIO 17
+  Serial.begin(9600);
+  dht.begin();
 
   Serial.println("Conectando a Rede: "); //Imprime na serial a mensagem
   Serial.println(ssid); //Imprime na serial o nome da Rede Wi-Fi
@@ -32,24 +32,28 @@ void setup()
 
 void loop()
 {
-  delay(4 * 1000 * 1);
-  float umi = dht.getHumidity();
-  float temp = dht.getTemperature();
+  delay(60 * 1000);
+  float umi = dht.readHumidity();
+  float temp = dht.readTemperature();
 
-  String dados = "{ 'umidade': " + String(umi, 1) + ", 'temperatura': " + String(temp, 1) + ", 'nome_sensor': 'A' }";
+  
+  String dados = "{\"umidade\": " + String(umi, 2) + ", \"temperatura\": " + String(temp, 2) + ", \"nome_sensor\": \"C\"}";
+  
    if(WiFi.status()== WL_CONNECTED){
 
     HTTPClient http;
 
-    http.begin("http://senai-metrologia.brazilsouth.cloudapp.azure.com/api");
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
+    http.begin("http://senai-metrologia.brazilsouth.cloudapp.azure.com/api/medidas");
+    http.addHeader("Content-Type", "application/json");
+     
     int codigo_resposta = http.POST(dados);
-
+     
     if(codigo_resposta>0){
+      
       Serial.println("Código HTTP : " + String(codigo_resposta));
+      Serial.println("Dados: " + dados);
 
-      if(codigo_resposta == 200){
+      if(codigo_resposta == 201){
         String resposta = http.getString();
         Serial.println("O servidor respondeu : ");
         Serial.println(resposta);
@@ -57,19 +61,14 @@ void loop()
       }
 
     }else{
-
      Serial.print("Erro enviando POST, código: ");
      Serial.println(codigo_resposta);
-
     }
 
     http.end();
 
   }else{
-
      Serial.println("Erro na conexão WIFI");
 
   }
-
-  Serial.println(dados);
 }
